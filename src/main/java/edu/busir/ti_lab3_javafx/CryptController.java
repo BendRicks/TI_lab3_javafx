@@ -8,8 +8,7 @@ import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Scene;
+import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.RadioButton;
@@ -17,14 +16,15 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleGroup;
 import javafx.stage.FileChooser;
-import javafx.stage.Stage;
+import javafx.util.Duration;
+import org.controlsfx.control.Notifications;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Scanner;
 
-public class HelloController {
+public class CryptController {
     @FXML
     private RadioButton encryptButton;
     @FXML
@@ -45,11 +45,10 @@ public class HelloController {
     private TextArea outputFileTextArea;
 
     private String kValue = "";
-    private String pValue = "";
 
     @FXML
     private void initialize() {
-        pValueTextField.textProperty().addListener(new ChangeListener<String>() {
+        pValueTextField.textProperty().addListener(new ChangeListener<>() {
             @Override
             public synchronized void changed(ObservableValue<? extends String> observableValue, String s, String t1) {
                 String newValue = pValueTextField.getText();
@@ -62,7 +61,7 @@ public class HelloController {
                 checkValues();
             }
         });
-        xValueTextField.textProperty().addListener(new ChangeListener<String>() {
+        xValueTextField.textProperty().addListener(new ChangeListener<>() {
             @Override
             public synchronized void changed(ObservableValue<? extends String> observableValue, String s, String t1) {
                 String newValue = xValueTextField.getText();
@@ -75,7 +74,7 @@ public class HelloController {
                 checkValues();
             }
         });
-        kValueTextField.textProperty().addListener(new ChangeListener<String>() {
+        kValueTextField.textProperty().addListener(new ChangeListener<>() {
             @Override
             public synchronized void changed(ObservableValue<? extends String> observableValue, String s, String t1) {
                 String newValue = kValueTextField.getText();
@@ -107,34 +106,62 @@ public class HelloController {
         FileChooser saveFileChooser = new FileChooser();
         saveFileChooser.setTitle("Save file");
         File loadFile = loadFileChooser.showOpenDialog(continueButton.getScene().getWindow());
-        File saveFile = saveFileChooser.showSaveDialog(continueButton.getScene().getWindow());
-        if (encryptButton.isSelected()) {
-            Cryptor cryptor = new Cryptor(Long.parseLong(pValueTextField.getText()), Long.parseLong(xValueTextField.getText()),
-                    Long.parseLong(kValueTextField.getText()), rootsComboBox.getValue());
-            try {
-                cryptor.cryptFile(loadFile, saveFile);
-                Scanner fis = new Scanner(new File("bin\\code.txt"));
-                StringBuilder stringBuilder = new StringBuilder();
-                while (fis.hasNext()) {
-                    stringBuilder.append(fis.nextLine());
+        if (loadFile != null) {
+            File saveFile = saveFileChooser.showSaveDialog(continueButton.getScene().getWindow());
+            if (saveFile != null) {
+                if (encryptButton.isSelected()) {
+                    Cryptor cryptor = new Cryptor(Long.parseLong(pValueTextField.getText()), Long.parseLong(xValueTextField.getText()),
+                            Long.parseLong(kValueTextField.getText()), rootsComboBox.getValue());
+                    try {
+                        cryptor.cryptFile(loadFile, saveFile);
+                        makeNotification(true, "Encryption", "Encrypted successful", 2000);
+                        var fis = new BufferedInputStream(new FileInputStream(saveFile));
+                        byte[] buff = new byte[1000];
+                        int shortsAmount = fis.read(buff) / 2;
+                        short[] shorts = new short[shortsAmount];
+                        ByteBuffer.wrap(buff).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(shorts);
+                        StringBuilder stringBuilder = new StringBuilder();
+                        for (int i = 0; i < shortsAmount; i += 2) {
+                            stringBuilder.append(shorts[i]).append(",").append(shorts[i + 1]).append(" ");
+                        }
+                        outputFileTextArea.setText(stringBuilder.toString());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        makeNotification(false, "Encryption", "Encrypting error", 2000);
+                    }
+                } else {
+                    Decryptor decryptor = new Decryptor(Long.parseLong(pValueTextField.getText()), Long.parseLong(xValueTextField.getText()));
+                    try {
+                        decryptor.decryptFile(loadFile, saveFile);
+                        makeNotification(true, "Decryption", "Decrypted successful", 2000);
+                        var fis = new BufferedInputStream(new FileInputStream(saveFile));
+                        byte[] buff = new byte[1000];
+                        int bytesAmount = fis.read(buff);
+                        StringBuilder stringBuilder = new StringBuilder();
+                        for (int i = 0; i < bytesAmount; i++) {
+                            stringBuilder.append(buff[i]).append(" ");
+                        }
+                        outputFileTextArea.setText(stringBuilder.toString());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        makeNotification(false, "Decryption", "Decrypting error", 2000);
+                    }
                 }
-                outputFileTextArea.setText(stringBuilder.toString());
-            } catch (IOException e) {
-                e.printStackTrace();
             }
+        }
+    }
+
+    private void makeNotification(boolean isSuccess, String title, String text, double delayTime) {
+        Notifications newNotification = Notifications.create()
+                .title(title)
+                .text(text)
+                .graphic(null)
+                .hideAfter(Duration.millis(delayTime))
+                .position(Pos.BOTTOM_RIGHT);
+        if (isSuccess) {
+            newNotification.showConfirm();
         } else {
-            Decryptor decryptor = new Decryptor(Long.parseLong(pValueTextField.getText()), Long.parseLong(xValueTextField.getText()));
-            try {
-                decryptor.decryptFile(loadFile, saveFile);
-                Scanner fis = new Scanner(new File("bin\\code.txt"));
-                StringBuilder stringBuilder = new StringBuilder();
-                while (fis.hasNext()) {
-                    stringBuilder.append(fis.nextLine());
-                }
-                outputFileTextArea.setText(stringBuilder.toString());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            newNotification.showError();
         }
     }
 
@@ -146,9 +173,7 @@ public class HelloController {
         new Thread(() -> {
             if (!pValueTextField.getText().isEmpty()) {
                 ArrayList<Long> roots = ArithmeticOperations.findPrimitiveRoots(Long.parseLong(pValueTextField.getText()));
-                Platform.runLater(() -> {
-                    rootsComboBox.setItems(FXCollections.observableArrayList(roots));
-                });
+                Platform.runLater(() -> rootsComboBox.setItems(FXCollections.observableArrayList(roots)));
             }
         }).start();
         checkValues();
@@ -160,13 +185,11 @@ public class HelloController {
         kValueTextField.setStyle("-fx-background-color: lightgray; -fx-background-radius: 10;");
         kValue = kValueTextField.getText();
         kValueTextField.setText("");
-        Platform.runLater(() -> {
-            rootsComboBox.setItems(FXCollections.observableArrayList(new ArrayList<>()));
-        });
+        Platform.runLater(() -> rootsComboBox.setItems(FXCollections.observableArrayList(new ArrayList<>())));
         checkValues();
     }
 
-    private void checkValues() {
+    private synchronized void checkValues() {
         new Thread(() -> {
             boolean incorrectData = false;
             long p = 0;
@@ -175,7 +198,9 @@ public class HelloController {
                 pValueTextField.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
                 incorrectData = true;
                 Platform.runLater(() -> {
-                    rootsComboBox.setItems(FXCollections.observableArrayList(new ArrayList<>()));
+                    synchronized (rootsComboBox) {
+                        rootsComboBox.setItems(FXCollections.observableArrayList(new ArrayList<>()));
+                    }
                 });
             } else {
                 pValueTextField.setStyle("-fx-background-color: lightgreen; -fx-background-radius: 10;");
@@ -185,7 +210,9 @@ public class HelloController {
                     new Thread(() -> {
                         ArrayList<Long> roots = ArithmeticOperations.findPrimitiveRoots(pKey);
                         Platform.runLater(() -> {
-                            rootsComboBox.setItems(FXCollections.observableArrayList(roots));
+                            synchronized (rootsComboBox) {
+                                rootsComboBox.setItems(FXCollections.observableArrayList(roots));
+                            }
                         });
                     }).start();
                 }
@@ -203,7 +230,9 @@ public class HelloController {
                 kValueTextField.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
                 incorrectData = true;
             } else {
-                kValueTextField.setStyle("-fx-background-color: lightgreen; -fx-background-radius: 10;");
+                if (encryptButton.isSelected()) {
+                    kValueTextField.setStyle("-fx-background-color: lightgreen; -fx-background-radius: 10;");
+                }
             }
             if (encryptButton.isSelected() && rootsComboBox.getValue() == null) {
                 incorrectData = true;

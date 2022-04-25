@@ -7,10 +7,10 @@ import javafx.stage.Stage;
 
 import java.io.IOException;
 
-public class HelloApplication extends Application {
+public class CryptApplication extends Application {
     @Override
     public void start(Stage stage) throws IOException {
-        FXMLLoader fxmlLoader = new FXMLLoader(HelloApplication.class.getResource("main-window.fxml"));
+        FXMLLoader fxmlLoader = new FXMLLoader(CryptApplication.class.getResource("main-window.fxml"));
         Scene scene = new Scene(fxmlLoader.load(), 490, 280);
         stage.setTitle("Шифрование Эль-Гамаля");
         stage.setResizable(false);

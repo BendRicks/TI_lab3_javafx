@@ -1,13 +1,9 @@
 package edu.busir.ti_lab3_javafx.logic;
 
-import java.io.BufferedWriter;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public class Cryptor {
 
@@ -24,20 +20,26 @@ public class Cryptor {
     }
 
     public void cryptFile(File fileToOpen, File fileToSave) throws IOException {
-        var fis = new FileInputStream(fileToOpen);
-        var fos = new DataOutputStream(new FileOutputStream(fileToSave));
-        var ffios = new BufferedWriter(new FileWriter("bin\\code.txt"));
+        var fis = new BufferedInputStream(new FileInputStream(fileToOpen));
+        var fos = new BufferedOutputStream(new FileOutputStream(fileToSave));
         while (fis.available() > 0) {
-            long b = (ArithmeticOperations.bigIntegerExp(key.getY(), k)
-                    .multiply(new BigInteger(String.valueOf(fis.read())))
-                    .mod(new BigInteger(String.valueOf(key.getP())))).longValue();
-            ffios.write(a + "," + b + " ");
-            fos.writeLong(a);
-            fos.writeLong(b);
+            byte[] buffer = new byte[8192];
+            int bytesAmount = fis.read(buffer);
+            short[] shorts = new short[bytesAmount * 2];
+            byte[] result = new byte[shorts.length*2];
+            for (int i = 0; i < bytesAmount; i++) {
+                int bt = buffer[i] & 0xff;
+                long b = (ArithmeticOperations.bigIntegerExp(key.getY(), k)
+                        .multiply(new BigInteger(String.valueOf(bt)))
+                        .mod(new BigInteger(String.valueOf(key.getP())))).longValue();
+                shorts[i*2] = (short) a;
+                shorts[i*2 + 1] = (short) b;
+            }
+            ByteBuffer.wrap(result).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(shorts);
+            fos.write(result);
         }
         fis.close();
         fos.close();
-        ffios.close();
     }
 
 }
