@@ -28,15 +28,11 @@ public class CryptController {
     @FXML
     private RadioButton encryptButton;
     @FXML
-    private RadioButton decryptButton;
-    @FXML
     private TextField pValueTextField;
     @FXML
     private TextField xValueTextField;
     @FXML
     private TextField kValueTextField;
-    @FXML
-    private ToggleGroup rbGroup;
     @FXML
     private ComboBox<Long> rootsComboBox;
     @FXML
@@ -58,7 +54,7 @@ public class CryptController {
                 if (pValueTextField.getText().length() > 4) {
                     pValueTextField.setText(pValueTextField.getText().substring(0, 4));
                 }
-                checkValues();
+                new Thread(() -> checkValues()).start();
             }
         });
         xValueTextField.textProperty().addListener(new ChangeListener<>() {
@@ -71,7 +67,7 @@ public class CryptController {
                 if (xValueTextField.getText().length() > 4) {
                     xValueTextField.setText(pValueTextField.getText().substring(0, 4));
                 }
-                checkValues();
+                new Thread(() -> checkValues()).start();
             }
         });
         kValueTextField.textProperty().addListener(new ChangeListener<>() {
@@ -84,12 +80,12 @@ public class CryptController {
                 if (kValueTextField.getText().length() > 4) {
                     kValueTextField.setText(pValueTextField.getText().substring(0, 4));
                 }
-                checkValues();
+                new Thread(() -> checkValues()).start();
             }
         });
         rootsComboBox.setOnHidden(actionEvent -> {
             if (encryptButton.isSelected()) {
-                checkValues();
+                new Thread(this::checkValues).start();
             }
         });
         continueButton.setDisable(true);
@@ -109,6 +105,7 @@ public class CryptController {
         if (loadFile != null) {
             File saveFile = saveFileChooser.showSaveDialog(continueButton.getScene().getWindow());
             if (saveFile != null) {
+                outputFileTextArea.setText("");
                 if (encryptButton.isSelected()) {
                     Cryptor cryptor = new Cryptor(Long.parseLong(pValueTextField.getText()), Long.parseLong(xValueTextField.getText()),
                             Long.parseLong(kValueTextField.getText()), rootsComboBox.getValue());
@@ -176,7 +173,7 @@ public class CryptController {
                 Platform.runLater(() -> rootsComboBox.setItems(FXCollections.observableArrayList(roots)));
             }
         }).start();
-        checkValues();
+        new Thread(this::checkValues).start();
     }
 
     @FXML
@@ -186,59 +183,57 @@ public class CryptController {
         kValue = kValueTextField.getText();
         kValueTextField.setText("");
         Platform.runLater(() -> rootsComboBox.setItems(FXCollections.observableArrayList(new ArrayList<>())));
-        checkValues();
+        new Thread(this::checkValues).start();
     }
 
     private synchronized void checkValues() {
-        new Thread(() -> {
-            boolean incorrectData = false;
-            long p = 0;
-            if (pValueTextField.getText().isEmpty() ||
-                    !ArithmeticOperations.isPrime(Long.parseLong(pValueTextField.getText()))) {
-                pValueTextField.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
-                incorrectData = true;
-                Platform.runLater(() -> {
-                    synchronized (rootsComboBox) {
-                        rootsComboBox.setItems(FXCollections.observableArrayList(new ArrayList<>()));
-                    }
-                });
-            } else {
-                pValueTextField.setStyle("-fx-background-color: lightgreen; -fx-background-radius: 10;");
-                p = Long.parseLong(pValueTextField.getText());
-                final long pKey = p;
-                if (encryptButton.isSelected()) {
-                    new Thread(() -> {
-                        ArrayList<Long> roots = ArithmeticOperations.findPrimitiveRoots(pKey);
-                        Platform.runLater(() -> {
-                            synchronized (rootsComboBox) {
-                                rootsComboBox.setItems(FXCollections.observableArrayList(roots));
-                            }
-                        });
-                    }).start();
+        boolean incorrectData = false;
+        long p = 0;
+        if (pValueTextField.getText().isEmpty() ||
+                !ArithmeticOperations.isPrime(Long.parseLong(pValueTextField.getText()))) {
+            pValueTextField.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
+            incorrectData = true;
+            Platform.runLater(() -> {
+                synchronized (rootsComboBox) {
+                    rootsComboBox.setItems(FXCollections.observableArrayList(new ArrayList<>()));
                 }
+            });
+        } else {
+            pValueTextField.setStyle("-fx-background-color: lightgreen; -fx-background-radius: 10;");
+            p = Long.parseLong(pValueTextField.getText());
+            final long pKey = p;
+            if (encryptButton.isSelected()) {
+                new Thread(() -> {
+                    ArrayList<Long> roots = ArithmeticOperations.findPrimitiveRoots(pKey);
+                    Platform.runLater(() -> {
+                        synchronized (rootsComboBox) {
+                            rootsComboBox.setItems(FXCollections.observableArrayList(roots));
+                        }
+                    });
+                }).start();
             }
-            if (xValueTextField.getText().isEmpty() || Long.parseLong(xValueTextField.getText()) <= 1
-                    || (!pValueTextField.getText().isEmpty() && Long.parseLong(xValueTextField.getText()) >= p)) {
-                xValueTextField.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
-                incorrectData = true;
-            } else {
-                xValueTextField.setStyle("-fx-background-color: lightgreen; -fx-background-radius: 10;");
+        }
+        if (xValueTextField.getText().isEmpty() || Long.parseLong(xValueTextField.getText()) <= 1
+                || (!pValueTextField.getText().isEmpty() && Long.parseLong(xValueTextField.getText()) >= p)) {
+            xValueTextField.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
+            incorrectData = true;
+        } else {
+            xValueTextField.setStyle("-fx-background-color: lightgreen; -fx-background-radius: 10;");
+        }
+        if (encryptButton.isSelected() && (kValueTextField.getText().isEmpty() || pValueTextField.getText().isEmpty() ||
+                Long.parseLong(kValueTextField.getText()) <= 1 || Long.parseLong(kValueTextField.getText()) >= p
+                || !ArithmeticOperations.isMutuallyPrime(p, Long.parseLong(kValueTextField.getText())))) {
+            kValueTextField.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
+            incorrectData = true;
+        } else {
+            if (encryptButton.isSelected()) {
+                kValueTextField.setStyle("-fx-background-color: lightgreen; -fx-background-radius: 10;");
             }
-            if (encryptButton.isSelected() && (kValueTextField.getText().isEmpty() || pValueTextField.getText().isEmpty() ||
-                    Long.parseLong(kValueTextField.getText()) <= 1 || Long.parseLong(kValueTextField.getText()) >= p
-                    || !ArithmeticOperations.isMutuallyPrime(p, Long.parseLong(kValueTextField.getText())))) {
-                kValueTextField.setStyle("-fx-background-color: white; -fx-background-radius: 10;");
-                incorrectData = true;
-            } else {
-                if (encryptButton.isSelected()) {
-                    kValueTextField.setStyle("-fx-background-color: lightgreen; -fx-background-radius: 10;");
-                }
-            }
-            if (encryptButton.isSelected() && rootsComboBox.getValue() == null) {
-                incorrectData = true;
-            }
-            continueButton.setDisable(incorrectData);
-        }).start();
+        }
+        if (encryptButton.isSelected() && rootsComboBox.getValue() == null) {
+            incorrectData = true;
+        }
+        continueButton.setDisable(incorrectData);
     }
 
 
